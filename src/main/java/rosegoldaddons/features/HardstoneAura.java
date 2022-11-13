@@ -5,11 +5,9 @@ import net.minecraft.block.BlockStainedGlassPane;
 import net.minecraft.block.BlockStone;
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.inventory.GuiChest;
 import net.minecraft.client.settings.GameSettings;
 import net.minecraft.init.Blocks;
 import net.minecraft.inventory.Container;
-import net.minecraft.inventory.ContainerChest;
 import net.minecraft.item.EnumDyeColor;
 import net.minecraft.network.play.client.C07PacketPlayerDigging;
 import net.minecraft.network.play.server.S2APacketParticles;
@@ -36,7 +34,6 @@ public class HardstoneAura {
     private ArrayList<BlockPos> broken = new ArrayList<>();
     private static int currentDamage;
     private static BlockPos closestStone;
-    private static Vec3 closestChest;
     private static Vec3 particlePos;
     private boolean stopHardstone = false;
     private static int ticks = 0;
@@ -95,113 +92,7 @@ public class HardstoneAura {
             }
         }
     }
-
-    @SubscribeEvent
-    public void receivePacket(ReceivePacketEvent event) {
-        if (!Main.autoHardStone) return;
-        if (event.packet instanceof S2APacketParticles) {
-            S2APacketParticles packet = (S2APacketParticles) event.packet;
-            if (packet.getParticleType().equals(EnumParticleTypes.CRIT)) {
-                Vec3 particlePos = new Vec3(packet.getXCoordinate(), packet.getYCoordinate(), packet.getZCoordinate());
-                if (closestChest != null) {
-                    stopHardstone = true;
-                    double dist = closestChest.distanceTo(particlePos);
-                    if (dist < 1) {
-                        if (!Main.configFile.serverSideChest) {
-                            ShadyRotation.smoothLook(ShadyRotation.vec3ToRotation(particlePos), Main.configFile.smoothLookVelocity, () -> {
-                            });
-                        } else {
-                            HardstoneAura.particlePos = particlePos;
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.NORMAL)
-    public void onUpdatePre(PlayerMoveEvent.Pre pre) {
-        if (particlePos != null && Main.configFile.serverSideChest) {
-            ShadyRotation.smoothLook(ShadyRotation.vec3ToRotation(particlePos), 0, () -> {
-            });
-        }
-    }
-
-    @SubscribeEvent(priority = EventPriority.HIGHEST)
-    public void chat(ClientChatReceivedEvent event) {
-        if (event.type != 0) return;
-        String message = event.message.getUnformattedText();
-        if(message.contains("You have successfully picked the lock on this chest!")) {
-            if(particlePos != null && stopHardstone) {
-                solved.add(closestChest);
-                particlePos = null;
-                stopHardstone = false;
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public void guiDraw(GuiScreenEvent.BackgroundDrawnEvent event) {
-        if (Main.configFile.guilag) {
-            Main.mc.gameSettings.setOptionFloatValue(GameSettings.Options.FRAMERATE_LIMIT, 1);
-        }
-        if (!Main.autoHardStone) return;
-        if (event.gui instanceof GuiChest) {
-            Container container = ((GuiChest) event.gui).inventorySlots;
-            if (container instanceof ContainerChest) {
-                String chestName = ((ContainerChest) container).getLowerChestInventory().getDisplayName().getUnformattedText();
-                if (chestName.contains("Treasure")) {
-                    solved.add(closestChest);
-                    particlePos = null;
-                    stopHardstone = false;
-                    Main.mc.thePlayer.closeScreen();
-                }
-            }
-        }
-    }
-
-    @SubscribeEvent
-    public void renderWorld(RenderWorldLastEvent event) {
-        if (!Main.autoHardStone) return;
-        closestStone = closestStone();
-        closestChest = closestChest();
-        if (closestStone != null) {
-            RenderUtils.drawBlockBox(closestStone, new Color(128, 128, 128), Main.configFile.lineWidth, event.partialTicks);
-        }
-        if (closestChest != null) {
-            RenderUtils.drawBlockBox(new BlockPos(closestChest.xCoord, closestChest.yCoord, closestChest.zCoord), new Color(255, 128, 0), Main.configFile.lineWidth, event.partialTicks);
-        } else {
-            stopHardstone = false;
-        }
-        if (gemstone != null) {
-            IBlockState blockState = Main.mc.theWorld.getBlockState(gemstone);
-            EnumDyeColor dyeColor = null;
-            Color color = Color.BLACK;
-            if (blockState.getBlock() == Blocks.stained_glass) {
-                dyeColor = blockState.getValue(BlockStainedGlass.COLOR);
-            }
-            if (blockState.getBlock() == Blocks.stained_glass_pane) {
-                dyeColor = blockState.getValue(BlockStainedGlassPane.COLOR);
-            }
-            if (dyeColor == EnumDyeColor.RED) {
-                color = new Color(188, 3, 29);
-            } else if (dyeColor == EnumDyeColor.PURPLE) {
-                color = new Color(137, 0, 201);
-            } else if (dyeColor == EnumDyeColor.LIME) {
-                color = new Color(157, 249, 32);
-            } else if (dyeColor == EnumDyeColor.LIGHT_BLUE) {
-                color = new Color(60, 121, 224);
-            } else if (dyeColor == EnumDyeColor.ORANGE) {
-                color = new Color(237, 139, 35);
-            } else if (dyeColor == EnumDyeColor.YELLOW) {
-                color = new Color(249, 215, 36);
-            } else if (dyeColor == EnumDyeColor.MAGENTA) {
-                color = new Color(214, 15, 150);
-            }
-            RenderUtils.drawBlockBox(gemstone, color, Main.configFile.lineWidth, event.partialTicks);
-        }
-    }
-
+    
     @SubscribeEvent
     public void clear(WorldEvent.Load event) {
         solved.clear();
